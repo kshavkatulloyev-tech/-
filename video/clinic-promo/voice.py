@@ -1,6 +1,7 @@
 # Generates Uzbek voice-over (Latin script — the uz-UZ voices do not read Cyrillic),
 # each line placed at its scene start and sped up slightly if it would overrun its slot.
-# Usage: python3 voice.py <workdir> <voice>   (voice: uz-UZ-SardorNeural | uz-UZ-MadinaNeural)
+# Usage: python3 voice.py <workdir> <voice>
+#   voice: uz-UZ-SardorNeural | uz-UZ-MadinaNeural (Edge TTS) or el:<ElevenLabs voice_id>
 import asyncio, os, subprocess, sys, json
 import edge_tts
 
@@ -18,6 +19,26 @@ LINES = [  # (start, end, text)
     (31.2, 36.2, "Hoziroq qo'ng'iroq qiling,|yoki Telegramda yozing!"),
 ]
 
+# Phrase schedule matching the on-screen captions (used for ElevenLabs voices)
+LINES_PHRASES = [
+    (0.25, 4.0,   "Bel va bo'yin og'rig'idan qiynalyapsizmi?"),
+    (4.2, 6.1,    "Yechimi bor!"),
+    (6.2, 8.0,    "Habibullo Shams klinikasi!"),
+    (8.05, 10.15, "Zamonaviy fizioterapiya"),
+    (10.2, 12.45, "va reabilitatsiya markazi."),
+    (12.6, 14.3,  "Kinezioterapiya."),
+    (14.4, 16.2,  "Massaj."),
+    (16.3, 18.3,  "TEKAR terapiya."),
+    (18.4, 20.2,  "Pressoterapiya."),
+    (20.3, 22.3,  "Malakali mutaxassislar,"),
+    (22.3, 24.3,  "zamonaviy apparatlar."),
+    (24.9, 28.2,  "Jami ellikdan ortiq fizioterapiya usuli!"),
+    (28.4, 30.5,  "Jonga shifo ham oro,"),
+    (30.55, 32.5, "nasib etsa topasiz!"),
+    (32.5, 34.5,  "Hoziroq qo'ng'iroq qiling,"),
+    (34.5, 36.3,  "yoki Telegramda yozing!"),
+]
+
 def dur(p):
     return float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
                                           '-of', 'csv=p=0', p]).decode().strip())
@@ -33,7 +54,20 @@ FX = ('highpass=f=75,equalizer=f=200:t=q:w=1:g=2.5,equalizer=f=3200:t=q:w=1.5:g=
       'equalizer=f=8000:t=q:w=2:g=1.5,acompressor=threshold=-20dB:ratio=3:attack=8:release=150:makeup=2,'
       'aecho=0.85:0.6:35|60:0.10|0.06')
 
+def synth_elevenlabs(text, voice_id, out):
+    """ElevenLabs TTS (eleven_v4 supports Uzbek). The API key is injected by the network proxy."""
+    import urllib.request
+    req = urllib.request.Request(
+        f'https://api.elevenlabs.io/v1/text-to-speech/{voice_id}?output_format=mp3_44100_128',
+        data=json.dumps({'text': text, 'model_id': 'eleven_v4', 'language_code': 'uz',
+                         'voice_settings': {'stability': 0.5, 'similarity_boost': 0.8, 'style': 0.3}}).encode(),
+        headers={'xi-api-key': 'proxy-injected', 'Content-Type': 'application/json'})
+    with urllib.request.urlopen(req, timeout=120) as r, open(out, 'wb') as f:
+        f.write(r.read())
+
 async def synth(text, voice, out, proxy):
+    if voice.startswith('el:'):
+        return synth_elevenlabs(text, voice[3:], out)
     rate, pitch = VOICE_CFG.get(voice, ('+0%', '+0Hz'))
     await edge_tts.Communicate(text, voice, rate=rate, pitch=pitch, proxy=proxy).save(out)
 
@@ -41,11 +75,15 @@ async def main(work, voice):
     os.makedirs(work, exist_ok=True)
     proxy = os.environ.get('HTTPS_PROXY')
     parts = []
-    for i, (a, b, text) in enumerate(LINES):
-        phrases = text.split('|'); files = []
+    lines = LINES_PHRASES if voice.startswith('el:') else LINES
+    for i, (a, b, text) in enumerate(lines):
+        phrases = [text.replace('|', ' ')] if voice.startswith('el:') else text.split('|'); files = []
         for j, ph in enumerate(phrases):
-            f = os.path.join(work, f'{voice}_{i:02d}_{j}.mp3'); await synth(ph, voice, f, proxy); files.append(f)
-        raw = os.path.join(work, f'{voice}_{i:02d}.wav')
+            f = os.path.join(work, f'{voice.replace(":", "_")}_{i:02d}_{j}.mp3')
+            if not (os.path.exists(f) and os.path.getsize(f) > 1000):  # cache: don't re-spend TTS credits
+                await synth(ph, voice, f, proxy)
+            files.append(f)
+        raw = os.path.join(work, f'{voice.replace(":", "_")}_{i:02d}.wav')
         if len(files) == 1:
             subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-i', files[0], '-af', TRIM, '-ar', '48000', '-ac', '1', raw])
         else:
@@ -63,8 +101,9 @@ async def main(work, voice):
         tf = f'atempo={min(tempo, 2.0):.3f},' if tempo > 1.0 else ''
         filters.append(f'[{k}:a]{tf}aresample=48000,adelay={int(a*1000)}|{int(a*1000)}[v{k}]')
     mix = ''.join(f'[v{k}]' for k in range(len(parts)))
-    filters.append(f'{mix}amix=inputs={len(parts)}:normalize=0,{FX},apad=whole_dur=36.4,atrim=0:36.4[out]')
-    out = os.path.join(work, f'voice_{voice}.wav')
+    fx = FX.rsplit(',aecho', 1)[0] if voice.startswith('el:') else FX
+    filters.append(f'{mix}amix=inputs={len(parts)}:normalize=0,{fx},apad=whole_dur=36.4,atrim=0:36.4[out]')
+    out = os.path.join(work, f'voice_{voice.replace(":", "_")}.wav')
     subprocess.check_call(['ffmpeg', '-v', 'error', '-y', *inputs, '-filter_complex', ';'.join(filters),
                            '-map', '[out]', '-ac', '2', out])
     print('->', out)
