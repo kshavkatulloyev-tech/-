@@ -6,29 +6,53 @@ import edge_tts
 
 LINES = [  # (start, end, text)
     (0.25, 4.0,  "Bel va bo'yin og'rig'idan qiynalyapsizmi?"),
-    (4.15, 8.0,  "Yechimi bor — Habibullo Shams klinikasi!"),
-    (8.1, 12.1, "Zamonaviy fizioterapiya va reabilitatsiya markazi."),
-    (12.2, 14.0, "Kinezioterapiya."),
-    (14.2, 16.0, "Massaj."),
-    (16.2, 18.0, "TEKAR terapiya."),
-    (18.2, 20.0, "Pressoterapiya."),
-    (20.2, 24.0, "Malakali mutaxassislar, zamonaviy apparatlar."),
+    (4.15, 8.0,  "Yechimi bor...|Habibullo Shams klinikasi!"),
+    (8.1, 12.1, "Zamonaviy fizioterapiya|va reabilitatsiya markazi."),
+    (12.05, 14.0, "Kinezioterapiya."),
+    (14.05, 16.0, "Massaj."),
+    (16.05, 18.0, "TEKAR terapiya."),
+    (18.05, 20.0, "Pressoterapiya."),
+    (20.2, 24.0, "Malakali mutaxassislar,|zamonaviy apparatlar."),
     (24.2, 28.0, "Jami ellikdan ortiq fizioterapiya usuli!"),
-    (28.1, 31.3, "Jonga shifo ham oro — nasib etsa topasiz!"),
-    (31.2, 36.2, "Hoziroq qo'ng'iroq qiling yoki Telegramda yozing!"),
+    (28.1, 31.3, "Jonga shifo ham oro,|nasib etsa topasiz!"),
+    (31.2, 36.2, "Hoziroq qo'ng'iroq qiling,|yoki Telegramda yozing!"),
 ]
 
 def dur(p):
     return float(subprocess.check_output(['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
                                           '-of', 'csv=p=0', p]).decode().strip())
 
+VOICE_CFG = {  # rate, pitch: slightly slower and lower than default sounds less robotic
+    'uz-UZ-SardorNeural': ('-4%', '-6Hz'),
+    'uz-UZ-MadinaNeural': ('-4%', '-2Hz'),
+}
+PAUSE = 0.22  # seconds of silence between phrases
+TRIM = 'silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.03,areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.06,areverse'  # strip the padding the TTS adds around each phrase
+# warm EQ, gentle compression and a short room reflection to soften the dry TTS sound
+FX = ('highpass=f=75,equalizer=f=200:t=q:w=1:g=2.5,equalizer=f=3200:t=q:w=1.5:g=-2.5,'
+      'equalizer=f=8000:t=q:w=2:g=1.5,acompressor=threshold=-20dB:ratio=3:attack=8:release=150:makeup=2,'
+      'aecho=0.85:0.6:35|60:0.10|0.06')
+
+async def synth(text, voice, out, proxy):
+    rate, pitch = VOICE_CFG.get(voice, ('+0%', '+0Hz'))
+    await edge_tts.Communicate(text, voice, rate=rate, pitch=pitch, proxy=proxy).save(out)
+
 async def main(work, voice):
     os.makedirs(work, exist_ok=True)
     proxy = os.environ.get('HTTPS_PROXY')
     parts = []
     for i, (a, b, text) in enumerate(LINES):
-        raw = os.path.join(work, f'{voice}_{i:02d}.mp3')
-        await edge_tts.Communicate(text, voice, rate='+5%', proxy=proxy).save(raw)
+        phrases = text.split('|'); files = []
+        for j, ph in enumerate(phrases):
+            f = os.path.join(work, f'{voice}_{i:02d}_{j}.mp3'); await synth(ph, voice, f, proxy); files.append(f)
+        raw = os.path.join(work, f'{voice}_{i:02d}.wav')
+        if len(files) == 1:
+            subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-i', files[0], '-af', TRIM, '-ar', '48000', '-ac', '1', raw])
+        else:
+            ins = sum([['-i', f] for f in files], [])
+            fc = ''.join(f'[{k}:a]aresample=48000,aformat=channel_layouts=mono,{TRIM}' + (f',apad=pad_dur={PAUSE}' if k < len(files)-1 else '') + f'[p{k}];' for k in range(len(files)))
+            fc += ''.join(f'[p{k}]' for k in range(len(files))) + f'concat=n={len(files)}:v=0:a=1[o]'
+            subprocess.check_call(['ffmpeg', '-v', 'error', '-y', *ins, '-filter_complex', fc, '-map', '[o]', raw])
         d = dur(raw); slot = (b - a) - 0.1
         tempo = max(1.0, d / slot)
         parts.append((a, raw, tempo, d))
@@ -39,7 +63,7 @@ async def main(work, voice):
         tf = f'atempo={min(tempo, 2.0):.3f},' if tempo > 1.0 else ''
         filters.append(f'[{k}:a]{tf}aresample=48000,adelay={int(a*1000)}|{int(a*1000)}[v{k}]')
     mix = ''.join(f'[v{k}]' for k in range(len(parts)))
-    filters.append(f'{mix}amix=inputs={len(parts)}:normalize=0,apad=whole_dur=36.4,atrim=0:36.4[out]')
+    filters.append(f'{mix}amix=inputs={len(parts)}:normalize=0,{FX},apad=whole_dur=36.4,atrim=0:36.4[out]')
     out = os.path.join(work, f'voice_{voice}.wav')
     subprocess.check_call(['ffmpeg', '-v', 'error', '-y', *inputs, '-filter_complex', ';'.join(filters),
                            '-map', '[out]', '-ac', '2', out])
