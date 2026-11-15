@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>Clinic Promo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&family=Lobster&display=block&subset=cyrillic-ext" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0B3A8C; --blue:#1E73D8; --green:#2E9E3F; --gold:#F5C518;
+    --sky:#EAF4FF; --muted:#9DB3D1;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{width:1080px;height:1920px;overflow:hidden;background:#EAF4FF}
+  body{font-family:'Nunito',sans-serif;color:var(--navy)}
+  #stage{position:relative;width:1080px;height:1920px;overflow:hidden;
+    background:linear-gradient(180deg,#F4F9FF 0%,#E3F0FF 45%,#CFE5FF 100%)}
+  .abs{position:absolute}
+  canvas#bokeh{position:absolute;inset:0}
+  #hills{position:absolute;left:0;bottom:0;width:1080px;height:520px}
+
+  /* top brand tag */
+  #tag{left:44px;top:56px;display:flex;align-items:center;gap:14px}
+  #tag .logo{width:64px;height:64px;border-radius:50%;background:#fff;overflow:hidden;
+    box-shadow:0 4px 14px rgba(11,58,140,.18);display:flex;align-items:center;justify-content:center}
+  #tag .logo img{width:64px;mix-blend-mode:multiply}
+  #tag .name{font-weight:900;font-size:26px;letter-spacing:1px;color:var(--navy)}
+  #tag .name small{display:block;font-size:18px;font-weight:800;color:var(--green);letter-spacing:3px}
+
+  /* step indicator */
+  #steps{left:44px;top:52px;width:992px;opacity:0}
+  #steps .row{display:flex;align-items:center;gap:16px}
+  #steps .num{width:58px;height:58px;border-radius:50%;background:var(--blue);color:#fff;
+    font-weight:900;font-size:32px;display:flex;align-items:center;justify-content:center;
+    box-shadow:0 6px 16px rgba(30,115,216,.35)}
+  #steps .lbl{font-weight:900;font-size:28px}
+  #steps .bars{display:flex;gap:10px;margin-top:14px}
+  #steps .bar{flex:1;height:8px;border-radius:4px;background:#C9DBF2;overflow:hidden}
+  #steps .bar i{display:block;height:100%;width:0;background:var(--blue)}
+
+  /* caption */
+  #caption{left:40px;right:40px;top:168px;text-align:center;font-weight:900;font-size:46px;
+    line-height:1.25;white-space:nowrap}
+  #caption span{display:inline-block;padding:2px 12px;border-radius:16px;margin:0 1px;transition:none}
+  #caption span.cur{background:var(--blue);color:#fff;box-shadow:0 6px 16px rgba(30,115,216,.35)}
+  #caption span.past{color:var(--navy)}
+  #caption span.fut{color:var(--muted)}
+
+  /* 3D title */
+  .t3d{font-weight:900;color:var(--navy);-webkit-text-stroke:12px #fff;paint-order:stroke fill;
+    text-shadow:0 3px 0 #dbe8f8,0 6px 0 #c4d6ee,0 9px 0 #a9c0e0,0 12px 0 #8eaad3,0 22px 28px rgba(11,58,140,.35);
+    letter-spacing:2px;line-height:1}
+  .title{left:0;right:0;text-align:center;white-space:nowrap}
+  .title span{display:inline-block;will-change:transform}
+  .red{color:#E5483B}
+  .grn{color:var(--green)}
+
+  /* 3D spine */
+  #spineWrap{left:0;width:1080px;top:470px;height:700px;perspective:1600px;perspective-origin:50% 40%}
+  #spine{position:absolute;left:540px;top:330px;transform-style:preserve-3d}
+  #spine div{position:absolute;backface-visibility:hidden}
+  .glow{position:absolute;border-radius:50%;filter:blur(30px)}
+
+  /* cards */
+  .card{background:#fff;border-radius:34px;box-shadow:0 24px 50px rgba(11,58,140,.18),0 4px 10px rgba(11,58,140,.08)}
+  .win{overflow:hidden}
+  .win .hd{height:56px;display:flex;align-items:center;gap:10px;padding:0 22px;border-bottom:1px solid #E6EEF8;
+    font-weight:800;font-size:22px;color:#5D78A3}
+  .win .hd i{width:14px;height:14px;border-radius:50%;display:inline-block}
+  .win .ph{position:relative;overflow:hidden}
+  .win .ph img{position:absolute;left:50%;top:50%;width:100%;height:100%;object-fit:cover;transform:translate(-50%,-50%)}
+  .pill{display:inline-flex;align-items:center;gap:14px;border-radius:999px;font-weight:900}
+  .chip{background:var(--blue);color:#fff;font-size:34px;padding:14px 34px;box-shadow:0 10px 24px rgba(30,115,216,.35)}
+
+  .flow{display:flex;align-items:center;justify-content:center;gap:18px}
+  .flow .node{width:230px;height:200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    font-weight:900;font-size:28px;text-align:center}
+  .flow .node .ic{font-size:70px;line-height:1}
+  .flow .arr{font-size:46px;font-weight:900;color:var(--blue)}
+
+  .check{left:150px;width:780px;height:92px;display:flex;align-items:center;gap:22px;padding:0 28px;font-weight:900;font-size:36px}
+  .check .ok{width:52px;height:52px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:32px;flex:none}
+
+  .thumb{width:180px;height:180px;border-radius:50%;overflow:hidden;border:8px solid #fff;box-shadow:0 14px 30px rgba(11,58,140,.25)}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+
+  #quote{z-index:3;left:80px;width:920px;top:500px;padding:56px 50px 60px;text-align:center}
+  #quote .q{font-family:'Lobster',cursive;font-size:76px;line-height:1.2;color:var(--navy)}
+  #quote .leaf{font-size:64px}
+  #quote .line{height:8px;width:420px;margin:26px auto 0;border-radius:4px;background:linear-gradient(90deg,var(--blue),var(--green))}
+
+  .contact{left:60px;width:640px;height:110px;padding:0 30px;display:flex;align-items:center;gap:20px;font-weight:900}
+  .contact .ic{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex:none}
+  #ctaPhone{background:var(--blue);color:#fff;font-size:44px}
+  #ctaPhone .ic{background:#fff}
+  #ctaTg{font-size:36px;color:var(--navy)}
+  #ctaTg .ic{background:#2AABEE}
+  #ctaTg .heart{margin-left:auto;font-size:40px}
+  #ctaAddr{font-size:32px;color:var(--navy)}
+  #ctaAddr .ic{background:var(--green)}
+  #qrCard{left:730px;width:300px;padding:20px;text-align:center;font-weight:900;font-size:20px;color:var(--navy);letter-spacing:1px}
+  #qrCard img{width:260px;height:260px;display:block;margin-bottom:10px}
+  .caret{display:inline-block;width:4px;height:40px;background:var(--blue);margin-left:4px;vertical-align:middle}
+
+  /* presenter */
+  #presenter{left:230px;top:1180px;width:620px;height:760px}
+  #halo{left:130px;top:1100px;width:820px;height:820px;border-radius:50%;
+    background:radial-gradient(circle,rgba(255,255,255,.95) 0%,rgba(255,255,255,.55) 40%,rgba(255,255,255,0) 70%)}
+  #ring{left:200px;top:1150px;width:680px;height:680px;border-radius:50%;border:6px dashed rgba(30,115,216,.35)}
+  #arch{position:absolute;inset:0;border-radius:310px 310px 0 0;overflow:hidden;border:12px solid #fff;border-bottom:none;
+    box-shadow:0 -10px 40px rgba(11,58,140,.25);background:#dfeaf7}
+  #arch img{position:absolute;opacity:0}
+  #badge{left:340px;top:1840px;width:400px;height:64px;justify-content:center;background:var(--green);color:#fff;font-size:28px;
+    box-shadow:0 10px 24px rgba(46,158,63,.4)}
+  #arrow{left:510px;top:1040px;font-size:80px;font-weight:900;color:#E5483B}
+  .sparkle{position:absolute;font-size:44px}
+  .float{position:absolute;font-size:54px}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="bokeh" width="1080" height="1920"></canvas>
+  <svg id="hills" viewBox="0 0 1080 520" preserveAspectRatio="none">
+    <path d="M0,260 C220,170 380,300 560,230 C760,150 900,250 1080,200 L1080,520 L0,520Z" fill="#BFDCFB" opacity=".75"/>
+    <path d="M0,340 C200,290 360,380 600,320 C800,270 940,340 1080,300 L1080,520 L0,520Z" fill="#A7D3B1" opacity=".55"/>
+  </svg>
+
+  <div id="tag" class="abs"><div class="logo"><img src="img/logo-mark.jpg"></div>
+    <div class="name">ҲАБИБУЛЛО ШАМС<small>КЛИНИКАСИ</small></div></div>
+
+  <div id="steps" class="abs">
+    <div class="row"><div class="num" id="stepNum">1</div><div class="lbl" id="stepLbl">1-усул · Кинезиотерапия</div></div>
+    <div class="bars"><div class="bar"><i></i></div><div class="bar"><i></i></div><div class="bar"><i></i></div><div class="bar"><i></i></div></div>
+  </div>
+
+  <div id="caption" class="abs"></div>
+
+  <!-- titles -->
+  <div id="tPain" class="abs title t3d" style="top:270px;font-size:170px"></div>
+  <div id="tSol" class="abs title t3d" style="top:280px;font-size:150px"></div>
+  <div id="tFiz" class="abs title t3d" style="top:290px;font-size:110px"></div>
+  <div id="t50" class="abs title t3d" style="top:300px;font-size:330px"><span class="grn" id="n50">0</span><span>+</span></div>
+  <div id="tCall" class="abs title t3d" style="top:270px;font-size:96px;line-height:1.08"></div>
+
+  <!-- scene A: spine -->
+  <div id="spineWrap" class="abs">
+    <div class="glow" id="painGlow" style="left:430px;top:560px;width:220px;height:200px;background:#ff4d3d;opacity:0"></div>
+    <div id="spine"></div>
+  </div>
+
+  <!-- scene B: logo card -->
+  <div id="logoCard" class="abs card" style="left:290px;top:500px;width:500px;height:500px;border-radius:50%;display:flex;align-items:center;justify-content:center;opacity:0">
+    <img src="img/logo-mark.jpg" style="width:420px;mix-blend-mode:multiply">
+  </div>
+
+  <!-- scene C: flow -->
+  <div id="flow" class="abs flow" style="left:0;right:0;top:560px">
+    <div class="node card" id="fl1"><div class="ic">🩺</div>Ташхис</div>
+    <div class="arr" id="fa1">➜</div>
+    <div class="node card" id="fl2"><div class="ic">⚡</div>Муолажа</div>
+    <div class="arr" id="fa2">➜</div>
+    <div class="node card" id="fl3"><div class="ic">💚</div>Соғлом ҳаёт</div>
+  </div>
+
+  <!-- scene D: treatment windows -->
+  <div id="cards"></div>
+  <div id="cardLabel" class="abs pill chip" style="top:1085px;left:540px;opacity:0"></div>
+
+  <!-- scene E: checklist -->
+  <div id="checks"></div>
+
+  <!-- scene F: thumbs -->
+  <div id="thumbs"></div>
+  <div id="usul" class="abs pill chip" style="top:690px;left:540px;opacity:0">физиотерапия усули</div>
+
+  <!-- scene G: quote -->
+  <div id="quote" class="abs card" style="opacity:0">
+    <div class="leaf">🌿</div>
+    <div class="q">«Жонга шифо ҳам оро,<br>насиб этса топасиз!»</div>
+    <div class="line"></div>
+  </div>
+
+  <!-- scene H: CTA -->
+  <div id="ctaPhone" class="abs card contact" style="top:560px;opacity:0"><div class="ic">📞</div>+998 93 963 10 95</div>
+  <div id="ctaTg" class="abs card contact" style="top:700px;opacity:0"><div class="ic">
+    <svg width="38" height="38" viewBox="0 0 24 24"><path fill="#fff" d="M21.5 3.6 2.9 10.8c-1.3.5-1.2 1.2-.2 1.5l4.8 1.5 1.8 5.6c.2.6.4.8.9.8.4 0 .6-.2.9-.5l2.4-2.3 4.9 3.6c.9.5 1.5.2 1.8-.8l3.2-15c.3-1.3-.5-1.9-1.9-1.6zM9.3 14.2l8.9-5.6c.4-.3.8-.1.5.2l-7.4 6.7-.3 3.2-1.7-4.5z"/></svg></div>
+    <span id="tgText"></span><span class="caret" id="caret"></span><span class="heart" id="heart">🤍</span></div>
+  <div id="ctaAddr" class="abs card contact" style="top:840px;opacity:0"><div class="ic">📍</div>Бухоро вил., Вобкент тумани</div>
+  <div id="qrCard" class="abs card" style="top:560px;opacity:0"><img src="img/qr.jpg">TELEGRAM КАНАЛ</div>
+
+  <!-- presenter -->
+  <div id="halo" class="abs"></div>
+  <div id="ring" class="abs"></div>
+  <div id="presenter" class="abs">
+    <div id="arch">
+      <img id="p1" src="img/doctor-at-desk.jpg"    style="width:1100px;left:-229px;top:-640px">
+      <img id="p2" src="img/doctor-tecar-device.jpg" style="width:1100px;left:-40px;top:-560px">
+      <img id="p3" src="img/patient-happy-tms.jpg"   style="width:1050px;left:-290px;top:-700px">
+    </div>
+  </div>
+  <div id="badge" class="abs pill">Малакали мутахассислар</div>
+  <div id="arrow" class="abs" style="opacity:0">⬇</div>
+  <div id="fx"></div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const clamp = (v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const lerp=(a,b,p)=>a+(b-a)*p;
+const eOut = p=>1-Math.pow(1-p,3);
+const eInOut = p=>p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;
+const eBack = p=>{const c1=1.70158,c3=c1+1;return 1+c3*Math.pow(p-1,3)+c1*Math.pow(p-1,2)};
+const prog=(t,a,d)=>clamp((t-a)/d);
+
+/* generic visibility: returns {o, s, x, y} */
+function win(t,a,b,ein=.45,eout=.3){
+  const pi=prog(t,a,ein), po=prog(t,b-eout,eout);
+  return {pi, po, o:clamp(pi*3)*(1-po), live:t>=a&&t<b};
+}
+function setT(el,o,tr){el.style.opacity=o;el.style.transform=tr;el.style.visibility=o<=0.001?'hidden':'visible';}
+
+/* ---------- captions ---------- */
+const CAPS=[
+ [0.0,2.2,'Бел ва бўйин оғриғидан'],
+ [2.2,4.0,'қийналяпсизми?'],
+ [4.0,6.0,'Ечими бор —'],
+ [6.0,8.0,'Ҳабибулло Шамс клиникаси!'],
+ [8.0,10.0,'Замонавий физиотерапия'],
+ [10.0,12.0,'ва реабилитация маркази.'],
+ [12.0,14.0,'Биринчи: кинезиотерапия'],
+ [14.0,16.0,'Иккинчи: массаж'],
+ [16.0,18.0,'Учинчи: ТЕКАР терапияси'],
+ [18.0,20.0,'Тўртинчи: прессотерапия'],
+ [20.0,22.0,'Малакали мутахассислар,'],
+ [22.0,24.0,'замонавий аппаратлар'],
+ [24.0,26.0,'Жами 50 дан ортиқ'],
+ [26.0,28.0,'физиотерапия усули!'],
+ [28.0,29.6,'Жонга шифо ҳам оро —'],
+ [29.6,31.0,'насиб этса топасиз!'],
+ [31.0,33.5,'Ҳозироқ қўнғироқ қилинг'],
+ [33.5,36.0,'ёки Telegram\'да ёзинг!'],
+];
+let capIdx=-1, capSpans=[];
+function renderCaption(t){
+  const i=CAPS.findIndex(c=>t>=c[0]&&t<c[1]);
+  const cap=$('#caption');
+  if(i!==capIdx){
+    capIdx=i; cap.innerHTML='';
+    capSpans=[];
+    if(i>=0){
+      CAPS[i][2].split(' ').forEach(w=>{const s=document.createElement('span');s.textContent=w;cap.appendChild(s);cap.appendChild(document.createTextNode(' '));capSpans.push(s);});
+    }
+  }
+  if(i<0) return;
+  const [a,b]=CAPS[i]; const words=capSpans.map(s=>s.textContent);
+  const tot=words.reduce((s,w)=>s+w.length+2,0); const span=(b-a)*0.92;
+  let acc=0, cur=words.length-1;
+  for(let k=0;k<words.length;k++){acc+=(words[k].length+2)/tot*span; if(t-a<acc){cur=k;break;}}
+  capSpans.forEach((s,k)=>{s.className=k<cur?'past':k===cur?'cur':'fut';});
+  const pin=eBack(prog(t,a,.25));
+  cap.style.transform=`translateY(${(1-pin)*18}px)`; cap.style.opacity=clamp(prog(t,a,.12));
+}
+
+/* ---------- letter-drop titles ---------- */
+function mkTitle(id,html){const el=$(id);
+  // html may contain [r]..[/r] for red
+  const parts=[];let cls='';
+  html.replace(/\[(\w)\]|\[\/\w\]|(.)/gs,(m,o,ch)=>{if(o){cls=o==='r'?'red':o==='g'?'grn':'';}else if(m.startsWith('[/')){cls='';}else{parts.push([ch,cls]);}});
+  el.innerHTML=parts.map(([c,k])=>c==='|'?'<br>':`<span class="${k}">${c===' '?'&nbsp;':c}</span>`).join('');
+}
+mkTitle('#tPain','[r]ОҒРИҚ?');
+mkTitle('#tSol','ЕЧИМ [g]БОР');
+mkTitle('#tFiz','ФИЗИОТЕРАПИЯ');
+mkTitle('#tCall','ҚЎНҒИРОҚ|[g]ҚИЛИНГ!');
+function renderTitle(id,t,a,b){
+  const el=$(id), spans=el.querySelectorAll('span');
+  const out=prog(t,b-.3,.3);
+  el.style.visibility=(t<a||t>b)?'hidden':'visible';
+  spans.forEach((s,i)=>{
+    const lt=t-a-i*.045; const p=clamp(lt/.38); const e=eBack(p);
+    const bob=Math.sin((t-a)*3+i*.6)*4*p;
+    s.style.opacity=clamp(lt/.12)*(1-out);
+    s.style.transform=`translateY(${(1-e)*-140+bob+out*-30}px) scale(${lerp(.2,1,e)*(1-out*.2)}) rotate(${(1-e)*(i%2?14:-14)}deg)`;
+  });
+}
+
+/* ---------- 3D spine ---------- */
+const spine=$('#spine'); const VERT=[]; const N=15;
+(function buildSpine(){
+  const M=14;
+  for(let i=0;i<N;i++){
+    const y=-300+i*44, r=30+i*1.4, h=30, zc=36*Math.sin((i/(N-1))*Math.PI*1.6-0.4);
+    const faces=[];
+    const w=2*r*Math.tan(Math.PI/M)+1.5;
+    for(let k=0;k<M;k++){const d=document.createElement('div');
+      d.style.cssText=`width:${w}px;height:${h}px;left:${-w/2}px;top:${-h/2}px;border-radius:3px`;
+      spine.appendChild(d); faces.push({d,a:k*360/M,kind:'bone',r,y,zc});}
+    // cap
+    const cap=document.createElement('div');
+    cap.style.cssText=`width:${2*r}px;height:${2*r}px;left:${-r}px;top:${-r}px;border-radius:50%`;
+    spine.appendChild(cap); faces.push({d:cap,cap:true,kind:'bone',r,y:y-h/2,zc});
+    // spinous process (two crossed plates)
+    for(const rot of [0,90]){const sp=document.createElement('div');
+      sp.style.cssText=`width:20px;height:40px;left:-10px;top:-20px;border-radius:8px 8px 12px 12px`;
+      spine.appendChild(sp); faces.push({d:sp,sp:rot,kind:'bone',r,y:y+6,zc});}
+    // transverse processes plate
+    const tp=document.createElement('div');
+    tp.style.cssText=`width:${2*r+64}px;height:16px;left:${-(2*r+64)/2}px;top:-8px;border-radius:8px`;
+    spine.appendChild(tp); faces.push({d:tp,tp:true,kind:'bone',r,y:y-2,zc});
+    VERT.push(faces);
+    if(i<N-1){ // disc
+      const dr=r*.96, dh=10, dy=y+27, dfaces=[]; const dw=2*dr*Math.tan(Math.PI/10)+1.5;
+      for(let k=0;k<10;k++){const d=document.createElement('div');
+        d.style.cssText=`width:${dw}px;height:${dh}px;left:${-dw/2}px;top:${-dh/2}px;border-radius:2px`;
+        spine.appendChild(d); dfaces.push({d,a:k*36,kind:'disc',r:dr,y:dy,zc:36*Math.sin(((i+.5)/(N-1))*Math.PI*1.6-0.4),idx:i});}
+      VERT.push(dfaces);
+    }
+  }
+})();
+let spineInit=false;
+function renderSpine(t,rot,pain){
+  if(!spineInit){spineInit=true;
+    VERT.forEach(group=>group.forEach(f=>{let tr;
+      if(f.cap) tr=`translate3d(0px,${f.y}px,${f.zc}px) rotateX(90deg)`;
+      else if(f.sp!==undefined) tr=`translate3d(0px,${f.y}px,${f.zc-(f.r+18)}px) rotateY(${f.sp}deg) rotateX(-28deg)`;
+      else if(f.tp) tr=`translate3d(0px,${f.y}px,${f.zc-f.r*.4}px)`;
+      else tr=`translate3d(0px,${f.y}px,${f.zc}px) rotateY(${f.a}deg) translateZ(${f.r}px)`;
+      f.d.style.transform=tr;
+      if(f.cap||f.sp!==undefined||f.tp) f.d.style.backfaceVisibility='visible';
+    }));}
+  VERT.forEach(group=>group.forEach(f=>{
+    let light;
+    if(f.cap) light=.97;
+    else if(f.sp!==undefined) light=.55+.35*Math.abs(Math.cos((rot+f.sp)*Math.PI/180));
+    else if(f.tp) light=.7+.25*Math.abs(Math.cos(rot*Math.PI/180));
+    else {const ang=f.a+rot; const c=Math.cos((ang-25)*Math.PI/180); light=.42+.58*Math.max(0,c);}
+    if(f.kind==='bone'){f.d.style.background=`hsl(38,42%,${Math.round(46+light*44)}%)`;}
+    else{
+      const hot=(f.idx===10||f.idx===11)?pain:0;
+      const L=.5+light*.35;
+      const r=Math.round(lerp(70*L*1.6,255*L*1.25,hot)), g=Math.round(lerp(150*L*1.4,70*L,hot)), b=Math.round(lerp(255*L*1.1,60*L,hot));
+      f.d.style.background=`rgb(${Math.min(255,r)},${Math.min(255,g)},${Math.min(255,b)})`;
+    }
+  }));
+}
+
+/* ---------- treatment windows ---------- */
+const TREAT=[
+  {img:'img/kinesio-room.jpg', name:'Кинезиотерапия', hd:'1-усул', pos:'50% 60%'},
+  {img:'img/massage-photo.jpg', name:'Массаж', hd:'2-усул', pos:'50% 40%'},
+  {img:'img/tecar-closeup.jpg', name:'ТЕКАР терапияси', hd:'3-усул', pos:'50% 50%'},
+  {img:'img/pressotherapy-patient.jpg', name:'Прессотерапия', hd:'4-усул', pos:'50% 75%'},
+];
+const cardEls=TREAT.map((tr,i)=>{
+  const c=document.createElement('div'); c.className='abs card win';
+  c.style.cssText=`left:210px;top:440px;width:660px;height:640px;opacity:0`;
+  c.innerHTML=`<div class="hd"><i style="background:#FF6058"></i><i style="background:#FFBD2E"></i><i style="background:#28C840"></i>&nbsp;habibullo-shams · ${tr.hd}</div>
+    <div class="ph" style="height:584px"><img src="${tr.img}" style="object-position:${tr.pos}"></div>`;
+  $('#cards').appendChild(c); return c;});
+
+/* ---------- checklist ---------- */
+const CHECKS=['Малакали мутахассислар','Замонавий аппаратлар','Беморлар учун қулай шароит','Болалар ва катталар учун'];
+const checkEls=CHECKS.map((txt,i)=>{const c=document.createElement('div');c.className='abs card check';
+  c.style.top=(470+i*112)+'px'; c.innerHTML=`<div class="ok">✓</div>${txt}`; $('#checks').appendChild(c); return c;});
+
+/* ---------- thumbs ---------- */
+const THUMBS=['img/kinesio-tile.jpg','img/massage-tile.jpg','img/laser-tile.jpg','img/tecar-closeup.jpg'];
+const thumbEls=THUMBS.map((src,i)=>{const c=document.createElement('div');c.className='abs thumb';
+  c.style.left=(90+i*230)+'px'; c.style.top='820px'; c.innerHTML=`<img src="${src}">`; $('#thumbs').appendChild(c); return c;});
+
+/* ---------- bokeh ---------- */
+const ctx=$('#bokeh').getContext('2d');
+const BOK=Array.from({length:22},(_,i)=>{const r=(Math.sin(i*91.7)+1)/2, q=(Math.cos(i*47.3)+1)/2;
+  return {x:r*1080,y:q*1700,rad:40+((i*37)%110),sp:.2+((i*13)%10)/20,ph:i,col:i%5===0?'rgba(46,158,63,':'rgba(255,255,255,'}});
+function renderBokeh(t){
+  ctx.clearRect(0,0,1080,1920);
+  BOK.forEach(b=>{const x=b.x+Math.sin(t*b.sp+b.ph)*60, y=b.y+Math.cos(t*b.sp*.8+b.ph)*40-t*6;
+    const yy=((y%1900)+1900)%1900;
+    const g=ctx.createRadialGradient(x,yy,0,x,yy,b.rad);
+    const a=b.col.startsWith('rgba(46')?.10:.55;
+    g.addColorStop(0,b.col+a+')'); g.addColorStop(1,b.col+'0)');
+    ctx.fillStyle=g; ctx.beginPath(); ctx.arc(x,yy,b.rad,0,Math.PI*2); ctx.fill();});
+}
+
+/* ---------- fx particles ---------- */
+const fx=$('#fx');
+const SPARK=Array.from({length:10},(_,i)=>{const s=document.createElement('div');s.className='sparkle';s.textContent=i%2?'✨':'⭐';fx.appendChild(s);return s;});
+const HEARTS=Array.from({length:9},(_,i)=>{const s=document.createElement('div');s.className='float';s.textContent=i%3?'💙':'💚';fx.appendChild(s);return s;});
+const BOLTS=Array.from({length:4},(_,i)=>{const s=document.createElement('div');s.className='float';s.textContent='⚡';fx.appendChild(s);return s;});
+
+/* ================= MAIN RENDER ================= */
+function render(t){
+  renderBokeh(t);
+  renderCaption(t);
+
+  // brand tag vs steps
+  const stepOn=t>=12&&t<20;
+  const sIn=prog(t,12,.35), sOut=prog(t,19.7,.3);
+  const stepO=stepOn?clamp(sIn*2)*(1-sOut):0;
+  setT($('#steps'),stepO,`translateY(${(1-eOut(sIn))*-30}px)`);
+  setT($('#tag'),1-stepO,'none');
+  if(stepOn){const k=Math.min(3,Math.floor((t-12)/2));
+    $('#stepNum').textContent=k+1; $('#stepLbl').textContent=`${k+1}-усул · ${TREAT[k].name}`;
+    document.querySelectorAll('#steps .bar i').forEach((b,j)=>{b.style.width=(j<k?100:j===k?clamp((t-12-2*k)/2)*100:0)+'%';});}
+
+  // titles
+  renderTitle('#tPain',t,.35,4.0);
+  renderTitle('#tSol',t,4.15,8.0);
+  renderTitle('#tFiz',t,8.15,12.0);
+  renderTitle('#tCall',t,31.15,36.2);
+  // 50+
+  {const w=win(t,24.1,28.0,.5,.3); const e=eBack(w.pi);
+   setT($('#t50'),w.o,`scale(${lerp(.3,1,e)*(1-w.po*.2)}) rotate(${(1-e)*-8}deg)`);
+   $('#n50').textContent=Math.round(50*eOut(prog(t,24.2,2.0)));}
+
+  // spine scene 0-4
+  {const w=win(t,0,4.05,.6,.35); const e=eOut(w.pi);
+   const pain=clamp(prog(t,1.6,.6))*(0.8+0.2*Math.sin(t*9));
+   $('#spineWrap').style.opacity=w.o; $('#spineWrap').style.visibility=w.o>0?'visible':'hidden';
+   const rot=t*55-30;
+   spine.style.transform=`translateY(${(1-e)*200}px) scale(${lerp(.6,1.0,e)}) rotateX(-14deg) rotateY(${rot}deg)`;
+   if(w.o>0) renderSpine(t,rot,pain);
+   $('#painGlow').style.opacity=pain*.85*w.o;
+   BOLTS.forEach((b,i)=>{const lt=t-1.8-i*.35; const p=clamp(lt/.4); const vis=lt>0&&t<3.9;
+     const ang=i*90+30; b.style.opacity=vis?(p<1?p:Math.max(0,.9+.1*Math.sin(t*12+i))):0;
+     b.style.left=(540+Math.cos(ang*Math.PI/180)*170-27)+'px'; b.style.top=(1030+Math.sin(ang*Math.PI/180)*90-27)+'px';
+     b.style.transform=`scale(${eBack(p)}) rotate(${Math.sin(t*10+i)*12}deg)`;});
+  }
+
+  // logo card 4.2-8
+  {const w=win(t,4.4,8.0,.5,.3); const e=eBack(w.pi);
+   setT($('#logoCard'),w.o,`perspective(1200px) rotateY(${(1-e)*90+Math.sin(t*2)*10}deg) scale(${lerp(.4,1,e)*(1-w.po*.3)})`);
+   SPARK.forEach((s,i)=>{const lt=t-4.7-i*.12; const live=lt>0&&t<8; const a=i/SPARK.length*Math.PI*2+t*.6;
+     const R=300+Math.sin(t*2+i)*20; s.style.left=(540+Math.cos(a)*R-22)+'px'; s.style.top=(750+Math.sin(a)*R*.85-22)+'px';
+     s.style.opacity=live?clamp(lt/.3)*(1-prog(t,7.7,.3))*(.6+.4*Math.sin(t*6+i)):0;
+     s.style.transform=`scale(${eBack(clamp(lt/.4))*(0.7+0.3*Math.sin(t*5+i))})`;});
+  }
+
+  // flow 8-12
+  {const ids=['#fl1','#fa1','#fl2','#fa2','#fl3']; const out=prog(t,11.7,.3);
+   ids.forEach((id,i)=>{const lt=t-8.5-i*.45; const p=clamp(lt/.4); const e=eBack(p); const on=t>=8&&t<12;
+     setT($(id),on?clamp(p*3)*(1-out):0,`translateY(${(1-e)*60+Math.sin(t*2.5+i)*5}px) scale(${lerp(.5,1,e)})`);});
+  }
+
+  // treatment cards 12-20
+  cardEls.forEach((c,i)=>{const a=12+i*2, b=a+2;
+    const pi=prog(t,a,.45), po=prog(t,b-.35,.35); const on=t>=a&&t<b;
+    const e=eOut(pi), eo=eInOut(po);
+    setT(c,on?clamp(pi*2)*(1-po):0,
+      `perspective(1400px) translateX(${(1-e)*700-eo*700}px) rotateY(${(1-e)*-35+eo*35}deg) rotateZ(${(1-e)*4}deg)`);
+    const img=c.querySelector('img'); img.style.transform=`translate(-50%,-50%) scale(${1+ (t-a)*.04})`;});
+  {const on=t>=12.3&&t<20; const k=Math.min(3,Math.max(0,Math.floor((t-12)/2)));
+   const lt=t-(12+k*2)-.3; const p=eBack(clamp(lt/.35)); const po=prog(t,12+k*2+1.75,.25);
+   const el=$('#cardLabel'); el.textContent=TREAT[k].name;
+   setT(el,on?clamp(lt/.15)*(1-po):0,`translateX(-50%) scale(${p})`);}
+
+  // checklist 20-24
+  checkEls.forEach((c,i)=>{const lt=t-20.2-i*.8; const p=clamp(lt/.4); const e=eBack(p); const out=prog(t,23.7,.3); const on=t>=20&&t<24;
+    setT(c,on?clamp(p*2)*(1-out):0,`translateX(${(1-e)*-260}px)`);
+    c.querySelector('.ok').style.transform=`scale(${eBack(clamp((lt-.2)/.35))})`;});
+
+  // 50+ thumbs & pill
+  thumbEls.forEach((c,i)=>{const lt=t-25.0-i*.25; const p=clamp(lt/.4); const e=eBack(p); const out=prog(t,27.7,.3); const on=t>=24&&t<28;
+    setT(c,on?clamp(p*2)*(1-out):0,`translateY(${Math.sin(t*2.4+i)*10}px) scale(${e})`);});
+  {const lt=t-24.8; const out=prog(t,27.7,.3); const on=t>=24&&t<28;
+   setT($('#usul'),on?clamp(lt/.2)*(1-out):0,`translateX(-50%) scale(${eBack(clamp(lt/.35))})`);}
+
+  // quote 28-31
+  {const w=win(t,28.1,31.0,.5,.3); const e=eBack(w.pi);
+   setT($('#quote'),w.o,`translateY(${(1-e)*80}px) scale(${lerp(.8,1,e)})`);
+   HEARTS.forEach((h,i)=>{const lt=t-28.3-i*.25; const live=lt>0&&t<31.2; const cyc=(lt%2.2)/2.2;
+     h.style.left=(120+i*100+Math.sin(t*2+i)*20)+'px'; h.style.top=(1150-cyc*700)+'px';
+     h.style.opacity=live?Math.sin(cyc*Math.PI)*.9:0; h.style.transform=`scale(${.7+.3*Math.sin(i)})`;});
+  }
+
+  // CTA 31-36
+  {const items=[['#ctaPhone',31.5],['#ctaTg',31.9],['#ctaAddr',32.3],['#qrCard',32.0]];
+   items.forEach(([id,a])=>{const lt=t-a; const p=clamp(lt/.45); const e=eBack(p); const on=t>=31;
+     setT($(id),on?clamp(p*2):0,`translateX(${id==='#qrCard'?(1-e)*300:(1-e)*-300}px) scale(${lerp(.7,1,e)})`);});
+   const ring=Math.max(0,Math.sin(t*14))*clamp(prog(t,32,.3));
+   $('#ctaPhone .ic').style.transform=`rotate(${ring*18*Math.sin(t*28)}deg) scale(${1+ring*.08})`;
+   const full='t.me/HabibulloShams'; const n=Math.round(full.length*clamp((t-32.6)/1.6));
+   $('#tgText').textContent=full.slice(0,n);
+   $('#caret').style.opacity=(t>32.4&&n<full.length)||(Math.floor(t*2)%2===0)?1:0;
+   const hp=prog(t,34.4,.4); $('#heart').textContent=hp>0?'❤️':'🤍'; $('#heart').style.transform=`scale(${1+Math.sin(hp*Math.PI)*.6})`;
+   const ap=clamp(prog(t,33.0,.3)); setT($('#arrow'),t>=33?ap:0,`translateY(${Math.abs(Math.sin(t*5))*22}px)`);
+  }
+
+  // presenter
+  {const enter=eBack(prog(t,0.1,.6));
+   $('#presenter').style.transform=`translateY(${(1-enter)*500}px) scale(${1+Math.sin(t*1.6)*.006})`;
+   $('#halo').style.opacity=enter; $('#ring').style.opacity=enter;
+   $('#ring').style.transform=`rotate(${t*12}deg)`;
+   const sel=t<20?0:t<28?1:t<31?2:0;
+   // crossfade weights
+   const W=[0,0,0];
+   const keys=[[0,0],[20,1],[28,2],[31,0]];
+   let curK=0; for(let k=0;k<keys.length;k++) if(t>=keys[k][0]) curK=k;
+   const kt=keys[curK][0], pf=keys[curK-1]?keys[curK-1][1]:keys[curK][1];
+   const f=curK===0?1:clamp((t-kt)/.4);
+   W[keys[curK][1]]+=f; W[pf]+=1-f;
+   ['#p1','#p2','#p3'].forEach((id,i)=>{const el=$(id); el.style.opacity=W[i]; el.style.transform=`scale(${1+(t%8)*.006})`; el.style.transformOrigin='50% 40%';});
+   const bl=['Малакали мутахассислар','Малакали мутахассислар','Мамнун беморлар 😊','Сизни кутамиз!'];
+   const bt=t<20?0:t<28?1:t<31?2:3; $('#badge').textContent=bl[bt];
+   const bp=eBack(prog(t,.6,.4)); $('#badge').style.transform=`scale(${bp})`; $('#badge').style.opacity=clamp(bp);
+  }
+}
+window.render=render;
+window.DURATION=36.4;
+render(0);
+</script>
+</body>
+</html>
